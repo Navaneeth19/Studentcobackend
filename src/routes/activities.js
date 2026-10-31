@@ -8,7 +8,7 @@ const {
   addReg,
   removeReg,
 } = require("../store/activityStore");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -58,6 +58,29 @@ router.get("/:id", optionalUser, (req, res) => {
   const mine = req.user ? regsFor(req.user.id) : [];
   res.json({ activity: serialize(a, mine) });
 });
+
+// GET /api/activities/:id/registrations — attendee list (staff only)
+router.get(
+  "/:id/registrations",
+  requireAuth,
+  requireRole("Teacher", "Activity Administrator", "Principal"),
+  (req, res) => {
+    const a = findActivity(req.params.id);
+    if (!a) return res.status(404).json({ message: "Activity not found." });
+    const { getRegs } = require("../store/activityStore");
+    const { readUsers } = require("../store/userStore");
+    const regs = getRegs();
+    const memberIds = Object.entries(regs)
+      .filter(([, ids]) => ids.includes(a.id))
+      .map(([userId]) => userId);
+    const byId = new Map(readUsers().map((u) => [u.id, u]));
+    const users = memberIds
+      .map((id) => byId.get(id))
+      .filter(Boolean)
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+    res.json({ activity: { id: a.id, title: a.title }, count: users.length, users });
+  }
+);
 
 // POST /api/activities — create (Teacher / Activity Administrator / Principal only)
 router.post("/", requireAuth, (req, res) => {

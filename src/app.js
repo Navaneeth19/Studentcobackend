@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 const authRoutes = require("./routes/auth");
 const activityRoutes = require("./routes/activities");
+const adminRoutes = require("./routes/admin");
+const announcementRoutes = require("./routes/announcements");
 
 function createApp() {
   const app = express();
@@ -13,6 +15,8 @@ function createApp() {
   );
   app.use("/api/auth", authRoutes);
   app.use("/api/activities", activityRoutes);
+  app.use("/api/admin", adminRoutes);
+  app.use("/api/announcements", announcementRoutes);
 
   // 404 for unknown API routes
   app.use("/api", (_req, res) => res.status(404).json({ message: "Not found" }));

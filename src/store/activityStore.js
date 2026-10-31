@@ -58,6 +58,7 @@ module.exports = {
   getActivities,
   saveActivities,
   findActivity,
+  getRegs,
   regsFor,
   addReg,
   removeReg,
