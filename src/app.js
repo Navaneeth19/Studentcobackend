@@ -12,6 +12,22 @@ function createApp() {
   app.use(cors());
   app.use(express.json({ limit: "100kb" }));
 
+  // Tiny in-memory rate limiter for auth endpoints (no extra dep).
+  // 60 requests / 15 min / IP — OTP store adds its own per-email cooldown.
+  const hits = new Map();
+  const AUTH_WINDOW = 15 * 60 * 1000;
+  const AUTH_MAX = 60;
+  app.use("/api/auth", (req, res, next) => {
+    const ip = req.ip || req.headers["x-forwarded-for"] || "unknown";
+    const now = Date.now();
+    const arr = (hits.get(ip) || []).filter((t) => now - t < AUTH_WINDOW);
+    arr.push(now);
+    hits.set(ip, arr);
+    if (arr.length > AUTH_MAX)
+      return res.status(429).json({ message: "Too many requests. Try again later." });
+    next();
+  });
+
   // Tiny request logger (method, path, status, ms).
   app.use((req, res, next) => {
     const start = Date.now();

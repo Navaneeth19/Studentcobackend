@@ -32,8 +32,12 @@ roles); staff accounts are created by a Principal via the admin API or the
 | Method | Path | Auth | Description |
 | ------ | ---- | ---- | ----------- |
 | GET | `/api/health` | No | Health check |
-| POST | `/api/auth/register` | No | Create **Student** account, get JWT |
+| POST | `/api/auth/register` | No | Create **Student** account, get JWT + verify-email OTP |
 | POST | `/api/auth/login` | No | Login, get JWT |
+| POST | `/api/auth/request-code` | No | Send 6-digit OTP `{ email, purpose }` — `verify-email`/`reset-password`/`passwordless` |
+| POST | `/api/auth/verify-email` | No | Verify email `{ email, code }` |
+| POST | `/api/auth/reset-password` | No | Reset password `{ email, code, newPassword }` (revokes old JWTs) |
+| POST | `/api/auth/passwordless/verify` | No | Sign in without password `{ email, code }` (auto-creates Student) |
 | POST | `/api/auth/firebase` | Firebase ID token | Exchange for backend JWT (auto-provisions Student) |
 | GET | `/api/auth/me` | Yes | Current user |
 | GET | `/api/activities?category=&q=&limit=&offset=` | No¹ | List activities (paginated) |

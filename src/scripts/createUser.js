@@ -46,6 +46,8 @@ async function main() {
     email: cleanEmail,
     role,
     passwordHash: await bcrypt.hash(String(password), 10),
+    emailVerified: true,
+    tokenVersion: 0,
     createdAt: new Date().toISOString(),
   };
   saveUser(user);

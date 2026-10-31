@@ -103,17 +103,19 @@ router.post(
       email: cleanEmail,
       role,
       passwordHash: await bcrypt.hash(String(password), 10),
+      emailVerified: true,
+      tokenVersion: 0,
       createdAt: new Date().toISOString(),
     };
     saveUser(user);
     res.status(201).json({
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt },
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, emailVerified: true, createdAt: user.createdAt },
     });
   }
 );
 
 function sanitize(u) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, emailVerified: u.emailVerified !== false, createdAt: u.createdAt };
 }
 
 // GET /api/admin/users — account directory (?role=&q=&limit=&offset=)
@@ -214,7 +216,10 @@ router.post(
     const { password = "" } = req.body || {};
     if (String(password).length < 6 || String(password).length > 200)
       return res.status(400).json({ message: "Password needs 6–200 characters." });
-    updateUser(target.id, { passwordHash: await bcrypt.hash(String(password), 10) });
+    updateUser(target.id, {
+      passwordHash: await bcrypt.hash(String(password), 10),
+      tokenVersion: (target.tokenVersion || 0) + 1,
+    });
     res.json({ reset: target.id });
   }
 );

@@ -10,6 +10,14 @@ const DATA_FILE = path.join(DATA_DIR, "users.json");
 const ADMIN_EMAIL = "admin@studentco.com";
 const ADMIN_PASSWORD = "admin123";
 
+function normalizeUser(u) {
+  if (!u) return u;
+  // Backward-compat: legacy accounts without flags count as verified, version 0.
+  if (u.emailVerified === undefined) u.emailVerified = true;
+  if (u.tokenVersion === undefined) u.tokenVersion = 0;
+  return u;
+}
+
 function seedAdmin() {
   const users = readUsers();
   if (!users.find((u) => u.email === ADMIN_EMAIL)) {
@@ -19,6 +27,8 @@ function seedAdmin() {
       email: ADMIN_EMAIL,
       role: "Principal",
       passwordHash: bcrypt.hashSync(ADMIN_PASSWORD, 10),
+      emailVerified: true,
+      tokenVersion: 0,
       createdAt: new Date().toISOString(),
     };
     users.push(adminUser);
@@ -39,7 +49,8 @@ seedAdmin();
 function readUsers() {
   ensureFile();
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8") || "[]");
+    const arr = JSON.parse(fs.readFileSync(DATA_FILE, "utf8") || "[]");
+    return (Array.isArray(arr) ? arr : []).map(normalizeUser);
   } catch {
     return [];
   }
@@ -51,13 +62,15 @@ function writeUsers(users) {
 }
 
 function findByEmail(email) {
-  return readUsers().find(
-    (u) => u.email.toLowerCase() === String(email).toLowerCase()
+  const found = readUsers().find(
+    (u) => String(u.email || "").toLowerCase() === String(email).toLowerCase()
   );
+  return found ? normalizeUser(found) : found;
 }
 
 function findById(id) {
-  return readUsers().find((u) => u.id === id);
+  const found = readUsers().find((u) => u.id === id);
+  return found ? normalizeUser(found) : found;
 }
 
 function saveUser(user) {
@@ -85,4 +98,4 @@ function deleteUser(id) {
   return true;
 }
 
-module.exports = { readUsers, findByEmail, findById, saveUser, updateUser, deleteUser };
+module.exports = { readUsers, findByEmail, findById, saveUser, updateUser, deleteUser, normalizeUser };
