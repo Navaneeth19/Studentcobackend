@@ -90,6 +90,11 @@ describe("health + auth", () => {
     assert.equal(r.s, 404);
     assert.ok(r.b.message);
   });
+
+  it("assistant validates input (empty message → 400, no keys spent)", async () => {
+    const r = await j("POST", "/api/assistant/chat", { message: "   ", events: [], notices: [] });
+    assert.equal(r.s, 400);
+  });
 });
 
 describe("activities", () => {

@@ -65,6 +65,7 @@ roles); staff accounts are created by a Principal via the admin API or the
 | GET | `/api/profile/feedback/mine` | Yes | My feedback map |
 | POST | `/api/profile/feedback` | Yes | Save feedback `{ activityId, stars 1-5, text<=500 }` (+10 XP) |
 | GET | `/api/profile/:id` | Yes | Public profile + XP for one user |
+| POST | `/api/assistant/chat` | No (IP rate-limited) | Campus guide `{ message, events[], notices[], history[] }` — Groq → Cerebras fallback, else 502 |
 
 ¹ Pass `Authorization: Bearer <token>` and each activity includes `registered: true/false` for that user.
 

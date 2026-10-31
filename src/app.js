@@ -4,10 +4,12 @@ const authRoutes = require("./routes/auth");
 const activityRoutes = require("./routes/activities");
 const adminRoutes = require("./routes/admin");
 const announcementRoutes = require("./routes/announcements");
+const assistantRoutes = require("./routes/assistant");
 const profileRoutes = require("./routes/profile");
 
 function createApp() {
   const app = express();
+  app.set("trust proxy", 1); // correct client IPs behind Railway/Heroku proxies
   // Open CORS: auth uses Bearer tokens (no cookies), so any frontend origin
   // (localhost ports, Firebase hosting, previews) can call the API.
   app.use(cors());
@@ -45,6 +47,7 @@ function createApp() {
   app.use("/api/activities", activityRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/announcements", announcementRoutes);
+  app.use("/api/assistant", assistantRoutes);
   app.use("/api/profile", profileRoutes);
 
   // 404 for unknown API routes
