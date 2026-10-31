@@ -6,7 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "create-user": "node src/scripts/createUser.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

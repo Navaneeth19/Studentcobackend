@@ -10,7 +10,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Backend runs on `http://localhost:5000`.
+Backend runs on `http://localhost:5001`.
 
 ## Endpoints
 
@@ -38,7 +38,7 @@ Passwords are hashed with bcrypt. Sessions are JWTs (`JWT_SECRET` in `.env`).
 Set in `Studentco/.env`:
 
 ```ini
-VITE_API_URL=http://localhost:5000
+VITE_API_URL=http://localhost:5001
 ```
 
 The frontend (`src/lib/api.js` + `src/store/auth.jsx`) calls these endpoints and

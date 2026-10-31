@@ -59,10 +59,10 @@ router.get("/:id", optionalUser, (req, res) => {
   res.json({ activity: serialize(a, mine) });
 });
 
-// POST /api/activities — create (Staff/Organizer only)
+// POST /api/activities — create (Teacher / Activity Administrator / Principal only)
 router.post("/", requireAuth, (req, res) => {
-  if (!["Staff", "Organizer"].includes(req.user.role))
-    return res.status(403).json({ message: "Only Staff or Organizers can publish activities." });
+  if (!["Teacher", "Activity Administrator", "Principal"].includes(req.user.role))
+    return res.status(403).json({ message: "Only Teachers, Activity Administrators or the Principal can publish activities." });
   const { title, org, category, date, venue, seatsTotal } = req.body || {};
   if (!title || !venue || !Number.isInteger(seatsTotal) || seatsTotal < 1)
     return res

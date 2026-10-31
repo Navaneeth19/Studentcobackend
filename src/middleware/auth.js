@@ -26,4 +26,14 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { signToken, requireAuth };
+// Role gate: requireAuth first, then requireRole("Teacher", ...) etc.
+function requireRole(...allowed) {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: "Missing token. Login first." });
+    if (!allowed.includes(req.user.role))
+      return res.status(403).json({ message: `Requires one of: ${allowed.join(", ")}` });
+    next();
+  };
+}
+
+module.exports = { signToken, requireAuth, requireRole };

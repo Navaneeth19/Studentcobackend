@@ -5,7 +5,12 @@ const { findByEmail, saveUser } = require("../store/userStore");
 const { signToken, requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
-const VALID_ROLES = ["Student", "Staff", "Organizer"];
+// Four roles: Student, Teacher, Activity Administrator, Principal.
+// Only Student accounts can be created via this public endpoint —
+// staff accounts are created by the school administrator
+// (see `npm run create-user`).
+const VALID_ROLES = ["Student", "Teacher", "Activity Administrator", "Principal"];
+const PUBLIC_SIGNUP_ROLES = ["Student"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function publicUser(u) {
@@ -24,6 +29,10 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ message: "Password needs at least 6 characters." });
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ message: `Role must be one of: ${VALID_ROLES.join(", ")}` });
+  if (!PUBLIC_SIGNUP_ROLES.includes(role))
+    return res.status(403).json({
+      message: "Only Student accounts can be created here. Staff accounts are issued by the school administrator.",
+    });
 
   const cleanEmail = String(email).trim().toLowerCase();
   if (findByEmail(cleanEmail))
