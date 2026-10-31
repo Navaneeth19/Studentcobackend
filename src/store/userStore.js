@@ -1,13 +1,39 @@
 const fs = require("fs");
 const path = require("path");
+const bcrypt = require("bcryptjs");
 
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "users.json");
+
+// ── Hardcoded super admin (always available for dev/CSS debugging) ──
+const ADMIN_EMAIL = "admin@studentco.com";
+const ADMIN_PASSWORD = "admin123";
+
+function seedAdmin() {
+  const users = readUsers();
+  if (!users.find((u) => u.email === ADMIN_EMAIL)) {
+    const adminUser = {
+      id: "admin-00000000-0000-0000-0000-000000000001",
+      name: "Super Admin",
+      email: ADMIN_EMAIL,
+      role: "Principal",
+      passwordHash: bcrypt.hashSync(ADMIN_PASSWORD, 10),
+      createdAt: new Date().toISOString(),
+    };
+    users.push(adminUser);
+    writeUsers(users);
+  }
+}
 
 function ensureFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, "[]", "utf8");
 }
+
+// Seed the hardcoded admin on module load (ensureFile no longer calls seedAdmin,
+// which avoids readUsers → ensureFile → seedAdmin → readUsers recursion).
+ensureFile();
+seedAdmin();
 
 function readUsers() {
   ensureFile();
