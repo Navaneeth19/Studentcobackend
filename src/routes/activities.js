@@ -67,9 +67,10 @@ router.get(
   (req, res) => {
     const a = findActivity(req.params.id);
     if (!a) return res.status(404).json({ message: "Activity not found." });
-    const { getRegs } = require("../store/activityStore");
+    const { getRegs, checkinFor } = require("../store/activityStore");
     const { readUsers } = require("../store/userStore");
     const regs = getRegs();
+    const checked = checkinFor(a.id);
     const memberIds = Object.entries(regs)
       .filter(([, ids]) => ids.includes(a.id))
       .map(([userId]) => userId);
@@ -77,11 +78,43 @@ router.get(
     const users = memberIds
       .map((id) => byId.get(id))
       .filter(Boolean)
-      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, checkedIn: !!checked[u.id], checkedInAt: checked[u.id] || null }));
     res.json({ activity: { id: a.id, title: a.title }, count: users.length, users });
   }
 );
 
+// POST /api/activities/:id/checkin — verify a ticket QR + mark entry (staff only)
+// Body: { email } — the holder email encoded in the student's ticket QR.
+router.post(
+  "/:id/checkin",
+  requireAuth,
+  requireRole("Teacher", "Activity Administrator", "Principal"),
+  (req, res) => {
+    const a = findActivity(req.params.id);
+    if (!a) return res.status(404).json({ message: "Activity not found." });
+    const { email = "" } = req.body || {};
+    if (!String(email).includes("@")) return res.status(400).json({ message: "Holder email is required." });
+    const { findByEmail } = require("../store/userStore");
+    const holder = findByEmail(String(email).trim().toLowerCase());
+    if (!holder) return res.status(404).json({ message: "No account found for this ticket.", verified: false });
+    const { regsFor, markCheckin } = require("../store/activityStore");
+    if (!regsFor(holder.id).includes(a.id))
+      return res.status(409).json({
+        verified: false,
+        message: `${holder.name} is not registered for ${a.title}.`,
+        attendee: { id: holder.id, name: holder.name, email: holder.email, role: holder.role },
+      });
+    const { already, at } = markCheckin(holder.id, a.id);
+    return res.status(already ? 200 : 201).json({
+      verified: true,
+      status: already ? "already-checked-in" : "checked-in",
+      message: already ? `${holder.name} already checked in.` : `${holder.name} verified — entry granted.`,
+      attendee: { id: holder.id, name: holder.name, email: holder.email, role: holder.role },
+      activity: { id: a.id, title: a.title },
+      checkedInAt: at,
+    });
+  }
+);
 // POST /api/activities — create (Teacher / Activity Administrator / Principal only)
 router.post("/", requireAuth, (req, res) => {
   if (!["Teacher", "Activity Administrator", "Principal"].includes(req.user.role))

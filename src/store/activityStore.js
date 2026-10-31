@@ -5,6 +5,7 @@ const seedActivities = require("../data/activities");
 const DATA_DIR = path.join(__dirname, "..", "..", "data");
 const ACTIVITIES_FILE = path.join(DATA_DIR, "activities.json");
 const REGS_FILE = path.join(DATA_DIR, "registrations.json");
+const CHECKINS_FILE = path.join(DATA_DIR, "checkins.json");
 
 function ensureFile(file, seed) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -54,6 +55,25 @@ function removeReg(userId, activityId) {
   return regs[userId];
 }
 
+// ── Check-ins: { [activityId]: { [userId]: checkedInAtISO } } ──
+const getCheckins = () => readJson(CHECKINS_FILE, {});
+const saveCheckins = (c) => writeJson(CHECKINS_FILE, c);
+
+function checkinFor(activityId) {
+  return getCheckins()[activityId] || {};
+}
+
+function markCheckin(userId, activityId) {
+  const all = getCheckins();
+  const entry = all[activityId] || {};
+  if (entry[userId]) return { already: true, at: entry[userId] };
+  const at = new Date().toISOString();
+  entry[userId] = at;
+  all[activityId] = entry;
+  saveCheckins(all);
+  return { already: false, at };
+}
+
 module.exports = {
   getActivities,
   saveActivities,
@@ -62,4 +82,7 @@ module.exports = {
   regsFor,
   addReg,
   removeReg,
+  getCheckins,
+  checkinFor,
+  markCheckin,
 };
