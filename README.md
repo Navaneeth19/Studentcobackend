@@ -59,6 +59,12 @@ roles); staff accounts are created by a Principal via the admin API or the
 | PATCH | `/api/admin/users/:id` | Principal | Rename / change role (last-Principal + self-demote protected) |
 | DELETE | `/api/admin/users/:id` | Principal | Remove account + their regs/check-ins (self/last-Principal protected) |
 | POST | `/api/admin/users/:id/reset-password` | Principal | Set a new password |
+| GET | `/api/profile/me` | Yes | Own profile + XP + level + stats |
+| PUT | `/api/profile/me` | Yes | Update profile `{ dept, year, bio, skills, link }` |
+| GET | `/api/profile/leaderboard?limit=&offset=` | No | Top users by XP (paginated, no emails) |
+| GET | `/api/profile/feedback/mine` | Yes | My feedback map |
+| POST | `/api/profile/feedback` | Yes | Save feedback `{ activityId, stars 1-5, text<=500 }` (+10 XP) |
+| GET | `/api/profile/:id` | Yes | Public profile + XP for one user |
 
 ¹ Pass `Authorization: Bearer <token>` and each activity includes `registered: true/false` for that user.
 
@@ -72,8 +78,12 @@ errors are always `{ message }` with 400 (validation), 401 (auth), 403 (role),
 
 File-backed JSON in `data/` (git-ignored — swap for a real DB later):
 `users.json`, `activities.json`, `announcements.json`, `registrations.json`,
-`checkins.json`. Seeds live in `src/data/` and populate empty files on boot.
+`checkins.json`, `profiles.json`, `feedbacks.json`. Seeds live in `src/data/` and populate empty files on boot.
 Set `STUDENTCO_DATA_DIR` to override the data dir (tests use a temp dir).
+
+XP: `joined×10 + attended(check-ins)×15 + feedbacks×10`, levels
+Newcomer 0 / Explorer 50 / Regular 120 / Champion 220 / Legend 350
+(same tiers as the frontend `calcXP`; squads-led/saved stay on-device).
 
 Passwords are hashed with bcrypt. Sessions are JWTs (`JWT_SECRET` in `.env`).
 Firebase linking needs `.firebase-service-account.json` (git-ignored, never commit).

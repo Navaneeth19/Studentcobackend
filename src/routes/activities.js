@@ -28,12 +28,22 @@ function optionalUser(req, _res, next) {
   if (!token) return next();
   try {
     const jwt = require("jsonwebtoken");
-    const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret-change-me");
     const { findById } = require("../store/userStore");
+    // Use the same secret helper as requireAuth (production-safe).
+    let secret;
+    try {
+      secret = require("../middleware/auth") && (process.env.JWT_SECRET || "dev-secret-change-me");
+    } catch {
+      secret = process.env.JWT_SECRET || "dev-secret-change-me";
+    }
+    const payload = jwt.verify(token, secret);
     const user = findById(payload.sub);
-    if (user) req.user = { id: user.id, role: user.role };
+    // Reject revoked tokens (same tv check as requireAuth).
+    if (user && (payload.tv ?? 0) === (user.tokenVersion ?? 0)) {
+      req.user = { id: user.id, role: user.role, emailVerified: user.emailVerified !== false };
+    }
   } catch {
-    /* invalid token → treat as guest */
+    /* invalid/expired/revoked token → treat as guest */
   }
   next();
 }
