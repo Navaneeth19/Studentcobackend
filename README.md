@@ -20,6 +20,13 @@ Backend runs on `http://localhost:5000`.
 | POST   | `/api/auth/register` | `{ name, email, password, role }`      | No     | Create account, get JWT  |
 | POST   | `/api/auth/login`  | `{ email, password }`                    | No     | Login, get JWT           |
 | GET    | `/api/auth/me`     | — (`Authorization: Bearer <token>`)      | Yes    | Current user             |
+| GET    | `/api/activities`  | `?category=&q=`                          | No¹    | List activities          |
+| GET    | `/api/activities/:id` | —                                     | No¹    | Activity detail          |
+| POST   | `/api/activities`  | `{ title, venue, seatsTotal, … }`        | Staff/Organizer | Publish activity |
+| POST   | `/api/activities/:id/register` | —                           | Yes    | Join activity            |
+| DELETE | `/api/activities/:id/register` | —                           | Yes    | Leave activity           |
+
+¹ Pass `Authorization: Bearer <token>` and each activity includes `registered: true/false` for that user.
 
 Valid `role` values: `Student`, `Staff`, `Organizer`.
 

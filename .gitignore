@@ -1,4 +1,4 @@
 node_modules/
 .env
-data/users.json
+data/
 npm-debug.log*
