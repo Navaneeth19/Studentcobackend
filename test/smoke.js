@@ -91,6 +91,13 @@ describe("health + auth", () => {
     assert.ok(r.b.message);
   });
 
+  it("AI generate validates kind (no keys spent)", async () => {
+    let r = await j("POST", "/api/ai/generate", { kind: "nope", payload: {} });
+    assert.equal(r.s, 400);
+    r = await j("POST", "/api/ai/generate", {});
+    assert.equal(r.s, 400);
+  });
+
   it("assistant validates input (empty message → 400, no keys spent)", async () => {
     const r = await j("POST", "/api/assistant/chat", { message: "   ", events: [], notices: [] });
     assert.equal(r.s, 400);

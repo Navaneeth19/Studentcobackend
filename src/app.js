@@ -5,6 +5,7 @@ const activityRoutes = require("./routes/activities");
 const adminRoutes = require("./routes/admin");
 const announcementRoutes = require("./routes/announcements");
 const assistantRoutes = require("./routes/assistant");
+const aiRoutes = require("./routes/ai");
 const profileRoutes = require("./routes/profile");
 
 function createApp() {
@@ -48,6 +49,7 @@ function createApp() {
   app.use("/api/admin", adminRoutes);
   app.use("/api/announcements", announcementRoutes);
   app.use("/api/assistant", assistantRoutes);
+  app.use("/api/ai", aiRoutes);
   app.use("/api/profile", profileRoutes);
 
   // 404 for unknown API routes
