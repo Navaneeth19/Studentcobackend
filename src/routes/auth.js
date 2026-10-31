@@ -69,6 +69,41 @@ router.post("/login", async (req, res) => {
   return res.json({ user: publicUser(user), token });
 });
 
+// POST /api/auth/firebase — exchange a Firebase ID token for a backend session.
+// Finds the backend user by verified email (keeping their backend role —
+// Student, Teacher, Activity Administrator, Principal). First-timers get a
+// Student account automatically.
+router.post("/firebase", async (req, res) => {
+  const { idToken = "" } = req.body || {};
+  if (!String(idToken)) return res.status(400).json({ message: "idToken is required." });
+  let decoded;
+  try {
+    const { verifyIdToken } = require("../lib/firebaseAdmin");
+    decoded = await verifyIdToken(String(idToken));
+  } catch (err) {
+    const status = /not configured/i.test(err.message) ? 503 : 401;
+    return res.status(status).json({ message: err.message || "Invalid Firebase token." });
+  }
+  const email = String(decoded.email || "").trim().toLowerCase();
+  if (!email) return res.status(401).json({ message: "Firebase token has no email." });
+
+  let user = findByEmail(email);
+  if (!user) {
+    user = {
+      id: crypto.randomUUID(),
+      name: String(decoded.name || email.split("@")[0]),
+      email,
+      role: "Student",
+      // Unusable password — this account signs in via Firebase only.
+      passwordHash: await bcrypt.hash(crypto.randomUUID(), 10),
+      createdAt: new Date().toISOString(),
+    };
+    saveUser(user);
+  }
+  const token = signToken(user);
+  return res.json({ user: publicUser(user), token });
+});
+
 // GET /api/auth/me — current session (Bearer token required)
 router.get("/me", requireAuth, (req, res) => {
   return res.json({ user: req.user });
