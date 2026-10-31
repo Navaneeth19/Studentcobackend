@@ -12,6 +12,15 @@ function createApp() {
   app.use(cors());
   app.use(express.json({ limit: "100kb" }));
 
+  // Tiny request logger (method, path, status, ms).
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      console.log(`${req.method} ${req.path} ${res.statusCode} ${Date.now() - start}ms`);
+    });
+    next();
+  });
+
   app.get("/api/health", (_req, res) =>
     res.json({ ok: true, service: "studentco-backend", time: new Date().toISOString() })
   );
@@ -22,6 +31,14 @@ function createApp() {
 
   // 404 for unknown API routes
   app.use("/api", (_req, res) => res.status(404).json({ message: "Not found" }));
+
+  // Central error handler: JSON shape is always { message }.
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, _req, res, _next) => {
+    console.error(err);
+    const status = err.status || err.statusCode || 500;
+    res.status(status).json({ message: err.message || "Something went wrong." });
+  });
   return app;
 }
 

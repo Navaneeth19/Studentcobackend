@@ -21,12 +21,12 @@ function publicUser(u) {
 router.post("/register", async (req, res) => {
   const { name = "", email = "", password = "", role = "Student" } = req.body || {};
 
-  if (String(name).trim().length < 2)
-    return res.status(400).json({ message: "Name needs at least 2 characters." });
-  if (!EMAIL_RE.test(String(email).trim()))
+  if (String(name).trim().length < 2 || String(name).trim().length > 120)
+    return res.status(400).json({ message: "Name needs 2–120 characters." });
+  if (!EMAIL_RE.test(String(email).trim()) || String(email).length > 254)
     return res.status(400).json({ message: "Enter a valid email address." });
-  if (String(password).length < 6)
-    return res.status(400).json({ message: "Password needs at least 6 characters." });
+  if (String(password).length < 6 || String(password).length > 200)
+    return res.status(400).json({ message: "Password needs 6–200 characters." });
   if (!VALID_ROLES.includes(role))
     return res.status(400).json({ message: `Role must be one of: ${VALID_ROLES.join(", ")}` });
   if (!PUBLIC_SIGNUP_ROLES.includes(role))

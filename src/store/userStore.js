@@ -2,7 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const DATA_DIR = process.env.STUDENTCO_DATA_DIR ||
+  path.join(__dirname, "..", "..", "data");
 const DATA_FILE = path.join(DATA_DIR, "users.json");
 
 // ── Hardcoded super admin (always available for dev/CSS debugging) ──
@@ -66,4 +67,22 @@ function saveUser(user) {
   return user;
 }
 
-module.exports = { readUsers, findByEmail, findById, saveUser };
+function updateUser(id, patch) {
+  const users = readUsers();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) return null;
+  const updated = { ...users[idx], ...patch, id: users[idx].id };
+  users[idx] = updated;
+  writeUsers(users);
+  return updated;
+}
+
+function deleteUser(id) {
+  const users = readUsers();
+  const next = users.filter((u) => u.id !== id);
+  if (next.length === users.length) return false;
+  writeUsers(next);
+  return true;
+}
+
+module.exports = { readUsers, findByEmail, findById, saveUser, updateUser, deleteUser };

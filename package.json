@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "create-user": "node src/scripts/createUser.js",
-    "seed-firebase": "node src/scripts/seedFirebaseUsers.js"
+    "seed-firebase": "node src/scripts/seedFirebaseUsers.js",
+    "test": "node --test test/smoke.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

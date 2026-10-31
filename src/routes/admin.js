@@ -3,7 +3,7 @@ const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const { getActivities, getRegs } = require("../store/activityStore");
-const { readUsers, findByEmail, saveUser } = require("../store/userStore");
+const { readUsers, findByEmail, findById, saveUser, updateUser, deleteUser } = require("../store/userStore");
 
 const router = express.Router();
 const VALID_ROLES = ["Student", "Teacher", "Activity Administrator", "Principal"];
@@ -109,6 +109,113 @@ router.post(
     res.status(201).json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role, createdAt: user.createdAt },
     });
+  }
+);
+
+function sanitize(u) {
+  return { id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt };
+}
+
+// GET /api/admin/users — account directory (?role=&q=&limit=&offset=)
+router.get(
+  "/users",
+  requireAuth,
+  requireRole("Activity Administrator", "Principal"),
+  (req, res) => {
+    const { role, q } = req.query;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+    let list = readUsers();
+    if (role) list = list.filter((u) => u.role === role);
+    if (q) {
+      const needle = String(q).toLowerCase();
+      list = list.filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(needle));
+    }
+    const total = list.length;
+    res.json({ users: list.slice(offset, offset + limit).map(sanitize), total, limit, offset });
+  }
+);
+
+// PATCH /api/admin/users/:id — rename / change role (Principal only)
+router.patch(
+  "/users/:id",
+  requireAuth,
+  requireRole("Principal"),
+  (req, res) => {
+    const target = findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User not found." });
+    const patch = {};
+    if (req.body.name !== undefined) {
+      if (typeof req.body.name !== "string" || req.body.name.trim().length < 2 || req.body.name.length > 120)
+        return res.status(400).json({ message: "Name needs 2–120 characters." });
+      patch.name = req.body.name.trim();
+    }
+    if (req.body.role !== undefined) {
+      if (!VALID_ROLES.includes(req.body.role))
+        return res.status(400).json({ message: `Role must be one of: ${VALID_ROLES.join(", ")}` });
+      if (target.id === req.user.id && req.body.role !== "Principal")
+        return res.status(409).json({ message: "You can't demote yourself." });
+      if (target.role === "Principal" && req.body.role !== "Principal") {
+        const principals = readUsers().filter((u) => u.role === "Principal");
+        if (principals.length <= 1)
+          return res.status(409).json({ message: "Can't demote the last Principal." });
+      }
+      patch.role = req.body.role;
+    }
+    if (Object.keys(patch).length === 0)
+      return res.status(400).json({ message: "Nothing to update (name, role)." });
+    res.json({ user: sanitize(updateUser(target.id, patch)) });
+  }
+);
+
+// DELETE /api/admin/users/:id — remove account + regs/check-ins (Principal)
+router.delete(
+  "/users/:id",
+  requireAuth,
+  requireRole("Principal"),
+  (req, res) => {
+    const target = findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User not found." });
+    if (target.id === req.user.id)
+      return res.status(409).json({ message: "You can't delete yourself." });
+    if (target.role === "Principal" && readUsers().filter((u) => u.role === "Principal").length <= 1)
+      return res.status(409).json({ message: "Can't delete the last Principal." });
+    deleteUser(target.id);
+    const { getRegs, getCheckins } = require("../store/activityStore");
+    const fs = require("fs");
+    const path = require("path");
+    const dataDir = process.env.STUDENTCO_DATA_DIR || path.join(__dirname, "..", "..", "data");
+    const regs = getRegs();
+    if (regs[target.id]) {
+      delete regs[target.id];
+      fs.writeFileSync(path.join(dataDir, "registrations.json"), JSON.stringify(regs, null, 2), "utf8");
+    }
+    const checkins = getCheckins();
+    let touched = false;
+    for (const aid of Object.keys(checkins)) {
+      if (checkins[aid][target.id]) {
+        delete checkins[aid][target.id];
+        touched = true;
+      }
+    }
+    if (touched) fs.writeFileSync(path.join(dataDir, "checkins.json"), JSON.stringify(checkins, null, 2), "utf8");
+    res.json({ deleted: target.id });
+  }
+);
+
+// POST /api/admin/users/:id/reset-password — set a new password (Principal)
+router.post(
+  "/users/:id/reset-password",
+  requireAuth,
+  requireRole("Principal"),
+  async (req, res) => {
+    const target = findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "User not found." });
+    const { password = "" } = req.body || {};
+    if (String(password).length < 6 || String(password).length > 200)
+      return res.status(400).json({ message: "Password needs 6–200 characters." });
+    updateUser(target.id, { passwordHash: await bcrypt.hash(String(password), 10) });
+    res.json({ reset: target.id });
   }
 );
 

@@ -4,6 +4,8 @@ const {
   getActivities,
   saveActivities,
   findActivity,
+  updateActivity,
+  deleteActivity,
   regsFor,
   addReg,
   removeReg,
@@ -36,9 +38,11 @@ function optionalUser(req, _res, next) {
   next();
 }
 
-// GET /api/activities?category=&q= — public list (registered=true when authed)
+// GET /api/activities?category=&q=&limit=&offset= — public list (registered=true when authed)
 router.get("/", optionalUser, (req, res) => {
   const { category, q } = req.query;
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
   const mine = req.user ? regsFor(req.user.id) : [];
   let list = getActivities();
   if (category) list = list.filter((a) => a.category === category);
@@ -48,7 +52,9 @@ router.get("/", optionalUser, (req, res) => {
       `${a.title} ${a.category} ${a.venue}`.toLowerCase().includes(needle)
     );
   }
-  res.json({ activities: list.map((a) => serialize(a, mine)), count: list.length });
+  const total = list.length;
+  const page = list.slice(offset, offset + limit);
+  res.json({ activities: page.map((a) => serialize(a, mine)), count: page.length, total, limit, offset });
 });
 
 // GET /api/activities/:id — public detail
@@ -116,34 +122,89 @@ router.post(
   }
 );
 // POST /api/activities — create (Teacher / Activity Administrator / Principal only)
-router.post("/", requireAuth, (req, res) => {
-  if (!["Teacher", "Activity Administrator", "Principal"].includes(req.user.role))
-    return res.status(403).json({ message: "Only Teachers, Activity Administrators or the Principal can publish activities." });
-  const { title, org, category, date, venue, seatsTotal } = req.body || {};
-  if (!title || !venue || !Number.isInteger(seatsTotal) || seatsTotal < 1)
-    return res
-      .status(400)
-      .json({ message: "title, venue and a positive integer seatsTotal are required." });
-  const activity = {
-    id: `act-${crypto.randomBytes(4).toString("hex")}`,
-    title: String(title),
-    org: String(org || req.user.name || "Campus"),
-    category: String(category || "General"),
-    date: String(date || "TBA"),
-    venue: String(venue),
-    seatsTotal,
-    seatsTaken: 0,
-    level: String(req.body.level || "Open to all"),
-    color: String(req.body.color || "#D6FF3F"),
-    emoji: String(req.body.emoji || "📌"),
-    desc: String(req.body.desc || ""),
-    requirements: Array.isArray(req.body.requirements) ? req.body.requirements : [],
-  };
-  const list = getActivities();
-  list.unshift(activity);
-  saveActivities(list);
-  res.status(201).json({ activity: serialize(activity, []) });
-});
+router.post(
+  "/",
+  requireAuth,
+  requireRole("Teacher", "Activity Administrator", "Principal"),
+  (req, res) => {
+    const { title = "", org = "", category = "General", date = "TBA", venue = "", seatsTotal } = req.body || {};
+    if (String(title).trim().length < 3 || String(title).length > 140)
+      return res.status(400).json({ message: "title needs 3–140 characters." });
+    if (String(venue).trim().length < 2 || String(venue).length > 140)
+      return res.status(400).json({ message: "venue needs 2–140 characters." });
+    if (!Number.isInteger(seatsTotal) || seatsTotal < 1 || seatsTotal > 100000)
+      return res.status(400).json({ message: "seatsTotal must be a positive integer (max 100000)." });
+    const activity = {
+      id: `act-${crypto.randomBytes(4).toString("hex")}`,
+      title: String(title).trim(),
+      org: String(org || req.user.name || "Campus").slice(0, 140),
+      category: String(category || "General").slice(0, 60),
+      date: String(date || "TBA").slice(0, 120),
+      venue: String(venue).trim(),
+      seatsTotal,
+      seatsTaken: 0,
+      level: String(req.body.level || "Open to all").slice(0, 120),
+      color: String(req.body.color || "#D6FF3F").slice(0, 20),
+      emoji: String(req.body.emoji || "📌").slice(0, 12),
+      desc: String(req.body.desc || "").slice(0, 2000),
+      requirements: Array.isArray(req.body.requirements)
+        ? req.body.requirements.map(String).map((s) => s.slice(0, 200)).slice(0, 30)
+        : [],
+    };
+    const list = getActivities();
+    list.unshift(activity);
+    saveActivities(list);
+    res.status(201).json({ activity: serialize(activity, []) });
+  }
+);
+
+// PUT /api/activities/:id — edit (staff only; seatsTotal can't drop below taken)
+router.put(
+  "/:id",
+  requireAuth,
+  requireRole("Teacher", "Activity Administrator", "Principal"),
+  (req, res) => {
+    const a = findActivity(req.params.id);
+    if (!a) return res.status(404).json({ message: "Activity not found." });
+    const patch = {};
+    const fields = ["title", "org", "category", "date", "venue", "level", "color", "emoji", "desc"];
+    for (const f of fields) {
+      if (req.body[f] !== undefined) {
+        if (typeof req.body[f] !== "string" || !req.body[f].trim())
+          return res.status(400).json({ message: `${f} must be a non-empty string.` });
+        patch[f] = req.body[f].trim();
+      }
+    }
+    if (req.body.seatsTotal !== undefined) {
+      if (!Number.isInteger(req.body.seatsTotal) || req.body.seatsTotal < 1 || req.body.seatsTotal > 100000)
+        return res.status(400).json({ message: "seatsTotal must be a positive integer (max 100000)." });
+      if (req.body.seatsTotal < a.seatsTaken)
+        return res.status(409).json({ message: `Can't shrink below ${a.seatsTaken} taken seats.` });
+      patch.seatsTotal = req.body.seatsTotal;
+    }
+    if (req.body.requirements !== undefined) {
+      if (!Array.isArray(req.body.requirements))
+        return res.status(400).json({ message: "requirements must be an array of strings." });
+      patch.requirements = req.body.requirements.map(String).map((s) => s.slice(0, 200)).slice(0, 30);
+    }
+    if (req.body.pinned !== undefined) patch.pinned = !!req.body.pinned;
+    if (req.body.featured !== undefined) patch.featured = !!req.body.featured;
+    const updated = updateActivity(a.id, patch);
+    res.json({ activity: serialize(updated, req.user ? regsFor(req.user.id) : []) });
+  }
+);
+
+// DELETE /api/activities/:id — remove + clean registrations/check-ins (AA/Principal)
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole("Activity Administrator", "Principal"),
+  (req, res) => {
+    const ok = deleteActivity(req.params.id);
+    if (!ok) return res.status(404).json({ message: "Activity not found." });
+    res.json({ deleted: req.params.id });
+  }
+);
 
 // POST /api/activities/:id/register — join (auth required)
 router.post("/:id/register", requireAuth, (req, res) => {

@@ -2,7 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const seedAnnouncements = require("../data/announcements");
 
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const DATA_DIR = process.env.STUDENTCO_DATA_DIR ||
+  path.join(__dirname, "..", "..", "data");
 const FILE = path.join(DATA_DIR, "announcements.json");
 
 function ensureFile() {
@@ -33,4 +34,26 @@ function sorted(list) {
   });
 }
 
-module.exports = { getAnnouncements, saveAnnouncements, sorted };
+function findAnnouncement(id) {
+  return getAnnouncements().find((n) => n.id === id);
+}
+
+function updateAnnouncement(id, patch) {
+  const list = getAnnouncements();
+  const idx = list.findIndex((n) => n.id === id);
+  if (idx === -1) return null;
+  const updated = { ...list[idx], ...patch, id: list[idx].id };
+  list[idx] = updated;
+  saveAnnouncements(list);
+  return updated;
+}
+
+function deleteAnnouncement(id) {
+  const list = getAnnouncements();
+  const next = list.filter((n) => n.id !== id);
+  if (next.length === list.length) return false;
+  saveAnnouncements(next);
+  return true;
+}
+
+module.exports = { getAnnouncements, saveAnnouncements, sorted, findAnnouncement, updateAnnouncement, deleteAnnouncement };

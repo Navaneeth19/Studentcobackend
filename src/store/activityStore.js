@@ -2,7 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const seedActivities = require("../data/activities");
 
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const DATA_DIR = process.env.STUDENTCO_DATA_DIR ||
+  path.join(__dirname, "..", "..", "data");
 const ACTIVITIES_FILE = path.join(DATA_DIR, "activities.json");
 const REGS_FILE = path.join(DATA_DIR, "registrations.json");
 const CHECKINS_FILE = path.join(DATA_DIR, "checkins.json");
@@ -30,6 +31,39 @@ function writeJson(file, value) {
 const getActivities = () => readJson(ACTIVITIES_FILE, seedActivities);
 const saveActivities = (list) => writeJson(ACTIVITIES_FILE, list);
 const findActivity = (id) => getActivities().find((a) => a.id === id);
+
+function updateActivity(id, patch) {
+  const list = getActivities();
+  const idx = list.findIndex((a) => a.id === id);
+  if (idx === -1) return null;
+  const updated = { ...list[idx], ...patch, id: list[idx].id };
+  list[idx] = updated;
+  saveActivities(list);
+  return updated;
+}
+
+function deleteActivity(id) {
+  const list = getActivities();
+  const next = list.filter((a) => a.id !== id);
+  if (next.length === list.length) return false;
+  saveActivities(next);
+  // Clean up dangling references.
+  const regs = getRegs();
+  let regsChanged = false;
+  for (const uid of Object.keys(regs)) {
+    if (regs[uid].includes(id)) {
+      regs[uid] = regs[uid].filter((x) => x !== id);
+      regsChanged = true;
+    }
+  }
+  if (regsChanged) saveRegs(regs);
+  const checkins = getCheckins();
+  if (checkins[id]) {
+    delete checkins[id];
+    saveCheckins(checkins);
+  }
+  return true;
+}
 
 // ── Registrations: { [userId]: [activityId, ...] } ──
 const getRegs = () => readJson(REGS_FILE, {});
@@ -78,6 +112,8 @@ module.exports = {
   getActivities,
   saveActivities,
   findActivity,
+  updateActivity,
+  deleteActivity,
   getRegs,
   regsFor,
   addReg,
